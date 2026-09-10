@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Oculta el botón VR -->
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    
+    .a-enter-vr-button { display: none !important; }
+    
+    /* Estilos para la animación intro */
+    #intro-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #000;
+      z-index: 1000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      animation: fadeInOut 4s ease-in-out forwards;
+      overflow: hidden;
+    }
+    
+    #intro-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0;
+      animation: fadeImage 3s ease-in-out forwards;
+    }
+    
+    @keyframes fadeInOut {
+      0% { opacity: 0; }
+      20% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { opacity: 0; display: none; }
+    }
+    
+    @keyframes fadeImage {
+      0% { opacity: 0; }
+      30% { opacity: 1; }
+      70% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    /* Estilos para los botones de control */
+    #control-buttons {
+      position: fixed;
+      bottom: 20px;
+      left: 0;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+    
+    .control-btn {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      border: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 20px;
+      cursor: pointer;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    }
+    
+    .control-btn:active {
+      transform: scale(0.95);
+    }
+
+    #startButton {
+      display: none;
+    }
+  </style>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v7.0.0/dist/aframe-extras.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <!-- Font Awesome para íconos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+  <!-- Animación de intro -->
+  <div id="intro-container">
+    <img id="intro-image" src="https://cdn.jsdelivr.net/gh/ANju200308/arvideo123@main/assets/intro.jpg" alt="Intro Animation">
+  </div>
+
+  <!-- Botones de control fijos -->
+  <div id="control-buttons">
+    <button id="play-pause-btn" class="control-btn"><i class="fas fa-pause"></i></button>
+    <button id="restart-btn" class="control-btn"><i class="fas fa-redo"></i></button>
+    <button id="mute-btn" class="control-btn"><i class="fas fa-volume-up"></i></button>
+  </div>
+
+  <a-scene
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false"
+    mindar-image="imageTargetSrc: https://cdn.jsdelivr.net/gh/ANju200308/arvideo123@main/assets/targets.mind; filterMinCF: 0.001; filterBeta: 0.01;"
+    color-space="sRGB"
+    renderer="colorManagement: true, physicallyCorrectLights"
+  >
+    <a-assets>
+      <!-- Videos, Masks, and Frames -->
+      
+      <!-- Marker 0 Assets -->
+      <video id="video0"
+             src="https://cdn.jsdelivr.net/gh/ANju200308/arvideo123@main/assets/video.mp4"
+             preload="auto" loop playsinline webkit-playsinline crossorigin="anonymous">
+      </video>
+      <img id="mask0" src="https://cdn.jsdelivr.net/gh/ANju200308/arvideo123@main/assets/mark_video.png" crossorigin="anonymous">
+      <img id="frame0" src="https://cdn.jsdelivr.net/gh/ANju200308/arvideo123@main/assets/Mark.png" crossorigin="anonymous">
+    </a-assets>
+
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+    
+    <!-- Marcador 0 -->
+    <a-entity id="target0" mindar-image-target="targetIndex: 0">
+      <!-- Grupo para la rotación -->
+      <a-entity id="markerGroup0">
+        <!-- Video con máscara aplicada -->
+        <a-plane id="plane0" src="#video0" video-mask="mask: #mask0"></a-plane>
+        <!-- Imagen PNG delante del video (marco/overlay) -->
+        <a-image id="overlay0" src="#frame0" material="transparent: true; alphaTest: 0.5"></a-image>
+      </a-entity>
+    </a-entity>
+  </a-scene>
+
+  <div id="startButton" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); 
+       background-color: rgba(0,0,0,0.5); color: white; padding: 10px 20px; border-radius: 5px; z-index: 999;">
+  </div>
+
+  <script>
+    // Componente personalizado para aplicar máscara al video
+    AFRAME.registerComponent('video-mask', {
+      schema: {
+        mask: { type: 'selector' }
+      },
+
+      init: function() {
+        const el = this.el;
+        const maskImg = this.data.mask;
+
+        // Esperar a que el componente esté listo
+        el.addEventListener('loaded', () => {
+          this.setupMask();
+        });
+      },
+
+      setupMask: function() {
+        const el = this.el;
+        const maskImg = this.data.mask;
+        
+        // Obtener el video element
+        const videoSrc = el.getAttribute('src');
+        const video = document.querySelector(videoSrc);
+
+        // Crear textura de máscara
+        const maskTexture = new THREE.TextureLoader().load(maskImg.src);
+        maskTexture.needsUpdate = true;
+        
+        // Crear textura de video
+        const videoTexture = new THREE.VideoTexture(video);
+        videoTexture.minFilter = THREE.LinearFilter;
+        videoTexture.magFilter = THREE.LinearFilter;
+
+        // Esperar a que el mesh esté disponible
+        setTimeout(() => {
+          const mesh = el.getObject3D('mesh');
+          if (!mesh) {
+            console.error('No se encontró el mesh');
+            return;
+          }
+
+          // Obtener la configuración de este marcador
+          const config = configs.find(c => c.planeId === el.id);
+          if (!config) return;
+
+          // Crear material con shader personalizado
+          const material = new THREE.ShaderMaterial({
+            uniforms: {
+              videoTexture: { value: videoTexture },
+              maskTexture: { value: maskTexture },
+              // NUEVO: Pasar uniforms de escala y posición
+              maskScale: { value: config.maskScale },
+              maskOffset: { value: new THREE.Vector2(config.maskPositionX, config.maskPositionY) }
+            },
+            vertexShader: `
+              varying vec2 vUv;
+              void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+              }
+            `,
+            fragmentShader: `
+              uniform sampler2D videoTexture;
+              uniform sampler2D maskTexture;
+              uniform float maskScale;
+              uniform vec2 maskOffset;
+              varying vec2 vUv;
+              
+              void main() {
+                vec4 videoColor = texture2D(videoTexture, vUv);
+                
+                // Aplicar escala y posición a la máscara
+                vec2 centeredUv = vUv - 0.5;
+                vec2 scaledUv = (centeredUv / maskScale) + 0.5;
+                vec2 finalUv = scaledUv - maskOffset;
+                
+                vec4 maskColor = texture2D(maskTexture, finalUv);
+                float alpha = maskColor.r;
+                
+                gl_FragColor = vec4(videoColor.rgb, alpha);
+              }
+            `,
+            transparent: true,
+            side: THREE.DoubleSide
+          });
+
+          // Aplicar el material
+          mesh.material = material;
+          mesh.material.needsUpdate = true;
+
+          console.log('Máscara aplicada correctamente para el marcador');
+        }, 100);
+      }
+    });
+
+    // ✨ CONFIGURACIÓN COMPLETA CON ESCALA GLOBAL POR MARCADOR ✨
+    const configs = [
+      { 
+        // MARCADOR 0
+        vidId: 'video0',
+        audioId: null,
+        planeId: 'plane0', 
+        overlayId: 'overlay0',
+        targetId: 'target0',
+        markerGroupId: 'markerGroup0',
+
+        // Global
+        globalScale: 1.2,
+        globalPositionX: 0,
+        globalPositionY: 0,
+        globalPositionZ: 0.25,
+        
+        // Video
+        videoScale: 1.32,
+        videoPositionX: -0.03,
+        videoPositionY: 0,
+        videoPositionZ: -0.31,
+        
+        // Frame/Overlay
+        overlayScale: 1.4,
+        framePositionX: 0,
+        framePositionY: 0,
+        framePositionZ: 0.05,
+        
+        // Mask
+        maskScale: 1.41,
+        maskPositionX: 0,
+        maskPositionY: 0,
+
+        // Rotation
+        rotationMin: 0,
+        rotationMax: 62,
+        rotationSpeed: 1.1
+      }
+    ];
+
+    // Variable para seguir el marcador activo
+    let activeMarkerIdx = null;
+
+    // Función auxiliar para obtener video y audio del marcador activo
+    function getActiveMedia() {
+      if (activeMarkerIdx === null) {
+        for (let i = 0; i < configs.length; i++) {
+          const targetEl = document.querySelector(`a-entity[mindar-image-target="targetIndex: ${i}"]`);
+          if (targetEl && targetEl.object3D.visible) {
+            activeMarkerIdx = i;
+            break;
+          }
+        }
+      }
+      if (activeMarkerIdx === null) return { video: null, audio: null };
+      const config = configs[activeMarkerIdx];
+      return {
+        video: document.getElementById(config.vidId),
+        audio: config.audioId ? document.getElementById(config.audioId) : null
+      };
+    }
+
+    // Configuración de videos, máscaras y overlays
+    configs.forEach((config) => {
+      const vid = document.getElementById(config.vidId);
+      const plane = document.getElementById(config.planeId);
+      const overlay = document.getElementById(config.overlayId);
+      const target = document.getElementById(config.targetId);
+      const markerGroup = document.getElementById(config.markerGroupId);
+
+      vid.addEventListener('loadedmetadata', () => {
+        const aspect = vid.videoWidth / vid.videoHeight;
+        
+        // Configurar VIDEO
+        plane.setAttribute('width', aspect);
+        plane.setAttribute('height', 1);
+        plane.setAttribute('scale', `${config.videoScale} ${config.videoScale} ${config.videoScale}`);
+        plane.setAttribute('position', `${config.videoPositionX} ${config.videoPositionY} ${config.videoPositionZ}`);
+        
+        // Configurar OVERLAY (marco)
+        overlay.setAttribute('width', aspect);
+        overlay.setAttribute('height', 1);
+        overlay.setAttribute('scale', `${config.overlayScale} ${config.overlayScale} ${config.overlayScale}`);
+        overlay.setAttribute('position', `${config.framePositionX} ${config.framePositionY} ${config.framePositionZ}`);
+        
+        // Aplicar ESCALA y POSICIÓN GLOBAL al grupo
+        markerGroup.setAttribute('scale', `${config.globalScale} ${config.globalScale} ${config.globalScale}`);
+        markerGroup.setAttribute('position', `${config.globalPositionX} ${config.globalPositionY} ${config.globalPositionZ}`);
+
+        // Aplicar ROTACIÓN
+        markerGroup.setAttribute('oscillate-rotation', {
+          min: config.rotationMin,
+          max: config.rotationMax,
+          speed: config.rotationSpeed
+        });
+      });
+    });
+
+    // Sistema de suavizado
+    AFRAME.registerComponent('smooth-position', {
+      schema: {
+        factor: { type: 'number', default: 0.1 }
+      },
+
+      init: function() {
+        this.targetPosition = new THREE.Vector3();
+        this.smoothedPosition = new THREE.Vector3();
+        
+        this.el.addEventListener('targetFound', () => {
+          this.smoothedPosition.copy(this.el.object3D.position);
+        });
+      },
+
+      tick: function() {
+        if (!this.el.object3D.visible) return;
+        this.targetPosition.copy(this.el.object3D.position);
+        this.smoothedPosition.lerp(this.targetPosition, this.data.factor);
+        this.el.object3D.position.copy(this.smoothedPosition);
+      }
+    });
+
+    // NUEVO: Componente para rotación oscilante
+    AFRAME.registerComponent('oscillate-rotation', {
+      schema: {
+        min: { type: 'number', default: 0 },
+        max: { type: 'number', default: 360 },
+        speed: { type: 'number', default: 1 }
+      },
+      init: function() {
+        this.direction = 1;
+        this.minRad = (this.data.min * Math.PI) / 180;
+        this.maxRad = (this.data.max * Math.PI) / 180;
+        this.el.object3D.rotation.y = this.minRad;
+      },
+      tick: function() {
+        const speed = this.data.speed * 0.002;
+        this.el.object3D.rotation.y += speed * this.direction;
+
+        if (this.el.object3D.rotation.y >= this.maxRad) {
+          this.direction = -1;
+        } else if (this.el.object3D.rotation.y <= this.minRad) {
+          this.direction = 1;
+        }
+      }
+    });
+
+    // Inicialización de la escena
+    document.querySelector('a-scene').addEventListener('renderstart', () => {
+      document.querySelectorAll('[mindar-image-target]').forEach(target => {
+        target.setAttribute('smooth-position', 'factor: 0.1');
+      });
+
+      configs.forEach((config, idx) => {
+        const vid = document.getElementById(config.vidId);
+        const aud = config.audioId ? document.getElementById(config.audioId) : null;
+        const targetEl = document.querySelector(`a-entity[mindar-image-target="targetIndex: ${idx}"]`);
+        
+        targetEl.addEventListener('targetFound', () => {
+          vid.play().catch(() => {});
+          if (aud) aud.play().catch(() => {});
+          activeMarkerIdx = idx;
+          updateButtonStates();
+        });
+        
+        targetEl.addEventListener('targetLost', () => {
+          vid.pause();
+          if (aud) aud.pause();
+          if (activeMarkerIdx === idx) {
+            activeMarkerIdx = null;
+          }
+        });
+      });
+    });
+
+    // Gestionar animación de intro
+    document.addEventListener('DOMContentLoaded', () => {
+      const introContainer = document.getElementById('intro-container');
+      const controlButtons = document.getElementById('control-buttons');
+      
+      setTimeout(() => {
+        introContainer.style.display = 'none';
+        controlButtons.style.opacity = '1';
+      }, 4000);
+    });
+
+    // Actualizar estados de botones
+    function updateButtonStates() {
+      const { video: activeVideo } = getActiveMedia();
+      if (!activeVideo) return;
+
+      const playPauseBtn = document.getElementById('play-pause-btn');
+      playPauseBtn.innerHTML = activeVideo.paused ? 
+        '<i class="fas fa-play"></i>' : 
+        '<i class="fas fa-pause"></i>';
+
+      const muteBtn = document.getElementById('mute-btn');
+      muteBtn.innerHTML = activeVideo.muted ? 
+        '<i class="fas fa-volume-mute"></i>' : 
+        '<i class="fas fa-volume-up"></i>';
+    }
+
+    // Manejadores de botones
+    document.getElementById('play-pause-btn').addEventListener('click', function() {
+      const { video: activeVideo, audio: activeAudio } = getActiveMedia();
+      if (!activeVideo) return;
+
+      if (activeVideo.paused) {
+        activeVideo.play().catch(() => {});
+        if (activeAudio) activeAudio.play().catch(() => {});
+        this.innerHTML = '<i class="fas fa-pause"></i>';
+      } else {
+        activeVideo.pause();
+        if (activeAudio) activeAudio.pause();
+        this.innerHTML = '<i class="fas fa-play"></i>';
+      }
+    });
+
+    document.getElementById('restart-btn').addEventListener('click', function() {
+      const { video: activeVideo, audio: activeAudio } = getActiveMedia();
+      if (!activeVideo) return;
+      
+      activeVideo.currentTime = 0;
+      activeVideo.play().catch(() => {});
+      if (activeAudio) {
+        activeAudio.currentTime = 0;
+        activeAudio.play().catch(() => {});
+      }
+      document.getElementById('play-pause-btn').innerHTML = '<i class="fas fa-pause"></i>';
+    });
+
+    document.getElementById('mute-btn').addEventListener('click', function() {
+      const { video: activeVideo, audio: activeAudio } = getActiveMedia();
+      if (!activeVideo) return;
+      
+      const newMuted = !activeVideo.muted;
+      activeVideo.muted = newMuted;
+      if (activeAudio) activeAudio.muted = newMuted;
+      this.innerHTML = newMuted ? 
+        '<i class="fas fa-volume-mute"></i>' : 
+        '<i class="fas fa-volume-up"></i>';
+    });
+  </script>
+</body>
+</html>
